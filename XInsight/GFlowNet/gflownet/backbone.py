@@ -57,12 +57,13 @@ class GCNBackbone(GFlowNetBackbone):
     
     def _init_backbone(self):
         
-        # GCN
+        # GCN (7-32) (32-64) (64-128) (128-128)
         layers = []
-        layers.append((GCNConv(self.num_features, self.num_gcn_hidden[0]), 'x, edge_index -> x'))
-        for i in range(1, len(self.num_gcn_hidden)):
-            if i == len(self.num_gcn_hidden) - 1:
-                layers.append((GCNConv(self.num_gcn_hidden[i], self.num_mlp_hidden[0]), 'x, edge_index -> x'))
+        for i in range(len(self.num_gcn_hidden) + 1):
+            if i == 0 :
+                layers.append((GCNConv(self.num_features, self.num_gcn_hidden[i]), 'x, edge_index -> x'))
+            elif i == len(self.num_gcn_hidden):
+                layers.append((GCNConv(self.num_gcn_hidden[i-1], self.num_mlp_hidden[0]), 'x, edge_index -> x'))
             else:
                 layers.append((GCNConv(self.num_gcn_hidden[i-1], self.num_gcn_hidden[i]), 'x, edge_index -> x'))
             layers.append(LeakyReLU(inplace=True))

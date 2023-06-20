@@ -19,7 +19,9 @@ def get_init_state_graph(num_node_features, start_idx=-1):
         )
     
     # Assign starting node feature
-    start_idx = np.random.randint(0, num_node_features)
+    if start_idx == -1:
+        start_idx = np.random.randint(0, num_node_features)
+
     g.x[0, start_idx] = 1
     g.y[0] = start_idx
 
@@ -98,3 +100,7 @@ def load_gflownet(gflownet, path, name):
     gflownet.proxy.load_state_dict(torch.load(proxy_path))
     
     return gflownet
+
+
+### PLOTTING UTILS ###
+

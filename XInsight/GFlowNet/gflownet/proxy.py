@@ -2,12 +2,14 @@
 from torch.nn import Linear, LeakyReLU, Dropout, Module
 from torch_geometric.nn import GCNConv, global_mean_pool, Sequential
 
-class Proxy(object):
+class Proxy(Module):
     def __init__(self):
         pass
     
     def forward(self, **kwargs):
         pass
+    
+    
     
     
 class GCN_Proxy(Module):
@@ -28,13 +30,15 @@ class GCN_Proxy(Module):
         layers = []
         for i in range(len(self.num_gcn_hidden)):
             if i == 0:
-                layers.append((GCNConv(self.num_node_features, self.num_hidden[i]), 'x, edge_index -> x'))
+                layers.append((GCNConv(self.num_node_features, self.num_gcn_hidden[i]), 'x, edge_index -> x'))
             else:
-                layers.append((GCNConv(self.num_hidden[i-1], self.num_hidden[i]), 'x, edge_index -> x'))
+                layers.append((GCNConv(self.num_gcn_hidden[i-1], self.num_gcn_hidden[i]), 'x, edge_index -> x'))
             layers.append(LeakyReLU(inplace=True))
             layers.append((Dropout(p=self.dropout), 'x -> x'))
             
         layers.append((global_mean_pool, 'x, batch -> x'))
+        layers.append((Dropout(p=self.dropout), 'x -> x')) 
+        
         # MLP
         for i in range(len(self.num_mlp_hidden)):
             if i == 0:
@@ -42,13 +46,13 @@ class GCN_Proxy(Module):
             else:
                 layers.append((Linear(self.num_mlp_hidden[i-1], self.num_mlp_hidden[i]), 'x -> x'))
             layers.append(LeakyReLU(inplace=True))
-            layers.append((Dropout(p=self.dropout), 'x -> x'))        
+        layers.append(Linear(self.num_mlp_hidden[-1], self.num_classes))
             
 
         self.model = Sequential(
-            'x, edge_index', layers
+            'x, edge_index, batch', layers
         )
         
-    def forward(self, x, edge_index):
+    def forward(self, x, edge_index, batch):
         
-        return self.model(x, edge_index)
+        return self.model(x, edge_index, batch)

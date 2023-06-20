@@ -1,9 +1,9 @@
-import utils
+import gflownet.utils as utils
 import torch
 from torch_geometric.data import Data
 from torch_geometric.utils import degree
 
-from proxy import Proxy
+from gflownet.proxy import Proxy
 
 
 ### ACTION CLASSES ###
@@ -21,14 +21,18 @@ class MutagAction(Action):
         
 ### STATE CLASSES ###
 class State():
-    def __init__(self, state_type, value):
-        self.type = state_type
+    def __init__(self, value):
         self.value = value
+    
+    def size(self):
+        return self.value.size()
         
 class MutagState(State):
-    def __init__(self, state_type, value):
-        super(MutagState, self).__init__(state_type, value)
-        
+    def __init__(self, value):
+        super(MutagState, self).__init__(value)
+    
+    def size(self):
+        return self.value.x.size(0)
 
 ### REWARD FUNCTIONS ###
 def class_prob_reward(proxy: Proxy, state: State, target: int, alpha: float=1.0,  threshold: float=0.5):
@@ -50,7 +54,7 @@ class Environment():
         self.proxy = proxy
         self.config = config
     
-    def new(self):
+    def new(self) -> State:
         pass
     
     def step(self, state: State, action: Action):
@@ -61,6 +65,7 @@ class MutagEnvironment(Environment):
     def __init__(self, env_name, reward_fn, proxy, config):
         super(MutagEnvironment, self).__init__(env_name, reward_fn, proxy, config)
             
+        self.state_type = "MutagGraph"
         self.node_feature_size = config['node_feature_size']
         self.alpha = config['alpha']
         self.threshold = config['threshold']
@@ -70,14 +75,15 @@ class MutagEnvironment(Environment):
 
         
         
-    def new(self, start_idx=-1):
-        return utils.get_init_state_graph(self.node_feature_size, start_idx)
+    def new(self, start_idx=-1) -> MutagState:
+        return MutagState(value=utils.get_init_state_graph(self.node_feature_size, start_idx))
     
     def step(self, state: MutagState, action: MutagAction):
-        new_state, valid, stop = self.take_action_mutag(state.value, (action.start, action.end))
+        new_state, valid, stop = self._take_action_mutag(state.value, (action.start, action.end))
+        new_state = MutagState(new_state)
         reward = self.calculate_reward(new_state)
         
-        return MutagState('mutag', new_state), reward, valid, stop
+        return new_state, reward, valid, stop
     
     def calculate_reward(self, state: MutagState):
         return self.reward_fn(self.proxy, state, self.target, self.alpha, self.threshold)
@@ -85,11 +91,11 @@ class MutagEnvironment(Environment):
     def _init_action_space(self):
         # Stop action is the first node in candidate list
         x = Data(
-            x=torch.zeros(self.num_features + 1, self.num_features), # +1 adds stop action
+            x=torch.zeros(self.node_feature_size + 1, self.node_feature_size), # +1 adds stop action
             edge_index=torch.zeros((2, 0), dtype=torch.long),
         )
 
-        for i in range(1, self.num_features + 1):
+        for i in range(1, self.node_feature_size + 1):
             x.x[i, i-1] = 1
         
         return x
